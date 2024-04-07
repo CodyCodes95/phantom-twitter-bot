@@ -1,10 +1,11 @@
-import { date } from "drizzle-orm/pg-core";
 import puppeteer from "puppeteer";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./db/schema";
 import { TwitterApi } from "twitter-api-v2";
 import { desc } from "drizzle-orm";
+import cron from "node-cron";
+
 const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -129,8 +130,4 @@ const sendTweet = async (tweet: string) => {
   await client.v2.tweet(tweet);
 };
 
-const main = async () => {
-  await recordAppRankings();
-};
-
-main();
+cron.schedule("0 8 * * *", recordAppRankings);

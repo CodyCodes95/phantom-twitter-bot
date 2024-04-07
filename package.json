@@ -1,6 +1,6 @@
 {
   "name": "degen-top-tracker",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",
@@ -8,6 +8,7 @@
     "db:migrate": "bun run src/db/migrate.ts"
   },
   "devDependencies": {
+    "@types/node-cron": "^3.0.11",
     "bun-types": "latest",
     "drizzle-kit": "^0.20.14",
     "prettier": "^3.2.5"
@@ -19,6 +20,7 @@
     "@neondatabase/serverless": "^0.9.0",
     "drizzle-orm": "^0.30.7",
     "elysia": "^1.0.13",
+    "node-cron": "^3.0.3",
     "puppeteer": "^22.6.2",
     "twitter-api-v2": "^1.16.1"
   }
