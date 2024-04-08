@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts",
     "db:generate": "drizzle-kit generate:pg --schema src/db/schema.ts --out ./drizzle",
     "db:migrate": "bun run src/db/migrate.ts"
   },

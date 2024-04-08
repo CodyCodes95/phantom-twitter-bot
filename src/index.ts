@@ -6,11 +6,6 @@ import { TwitterApi } from "twitter-api-v2";
 import { desc } from "drizzle-orm";
 import cron from "node-cron";
 
-const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
-
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql, { schema });
-
 type App = {
   name: string;
   url: string;
@@ -22,18 +17,14 @@ type AppRanks = {
   specificRank: number;
 };
 
-const appsToTrack = [
-  {
-    name: "Phantom",
-    url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
-    category: "Utilities",
-  },
-  // {
-  //   name: "Coinbase Wallet",
-  //   url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
-  //   category: "Finance",
-  // },
-];
+type MostRecentRank = {
+  date: Date | null;
+  id: number;
+  app: string | null;
+  category: string | null;
+  allRank: number | null;
+  specificRank: number | null;
+};
 
 const getAppRankings = async (app: App) => {
   const browser = await puppeteer.launch();
@@ -71,27 +62,7 @@ const getAppRankings = async (app: App) => {
   return appRanks;
 };
 
-const recordAppRankings = async () => {
-  for (const app of appsToTrack) {
-    const appRanks = await getAppRankings(app);
-    if (!appRanks) return;
-    const tweet = await generateTweet(appRanks.allRank, appRanks.specificRank);
-    console.log(tweet);
-    await sendTweet(tweet);
-    await db.insert(schema.appTracking).values({
-      app: app.name,
-      date: new Date(),
-      category: app.category,
-      allRank: Number(appRanks.allRank),
-      specificRank: Number(appRanks.specificRank),
-    });
-  }
-};
-
-const generateTweet = async (allRank: number, specificRank: number) => {
-  const mostRecentRank = await db.query.appTracking.findFirst({
-    orderBy: desc(schema.appTracking.date),
-  });
+const generateTweet = async (allRank: number, specificRank: number, mostRecentRank: MostRecentRank) => {
   const generateAllTrend = () => {
     if (!mostRecentRank?.allRank) return;
     if (mostRecentRank.allRank === allRank) return `📊 ${allRank} (+0)`;
@@ -130,4 +101,44 @@ const sendTweet = async (tweet: string) => {
   await client.v2.tweet(tweet);
 };
 
-cron.schedule("0 8 * * *", recordAppRankings);
+const main = async () => {
+  const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
+  const appsToTrack = [
+    {
+      name: "Phantom",
+      url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
+      category: "Utilities",
+    },
+    // {
+    //   name: "Coinbase Wallet",
+    //   url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
+    //   category: "Finance",
+    // },
+  ];
+
+  const sql = neon(process.env.DATABASE_URL!);
+  const db = drizzle(sql, { schema });
+
+  const mostRecentRank = await db.query.appTracking.findFirst({
+    orderBy: desc(schema.appTracking.date),
+  });
+
+  for (const app of appsToTrack) {
+    const appRanks = await getAppRankings(app);
+    if (!appRanks || !mostRecentRank) return;
+    const tweet = await generateTweet(appRanks.allRank, appRanks.specificRank, mostRecentRank);
+    console.log(tweet);
+    await sendTweet(tweet);
+    await db.insert(schema.appTracking).values({
+      app: app.name,
+      date: new Date(),
+      category: app.category,
+      allRank: Number(appRanks.allRank),
+      specificRank: Number(appRanks.specificRank),
+    });
+  }
+};
+
+cron.schedule("0 8 * * *", main);
+
+// main()
