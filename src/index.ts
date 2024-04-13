@@ -39,6 +39,7 @@ type GenerateTweetOptions = {
   mostRecentRank: MostRecentRank;
   appName: string;
   category: string;
+  emoji: string;
 };
 
 const getAppsToTrack = (yesterdaysDate: string) => {
@@ -47,11 +48,13 @@ const getAppsToTrack = (yesterdaysDate: string) => {
       name: "Phantom",
       url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
       category: "Utilities",
+      emoji: "👻",
     },
     {
       name: "Coinbase Wallet",
       url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
       category: "Finance",
+      emoji: "🪙",
     },
   ];
 };
@@ -93,7 +96,7 @@ const scrapeAppRankings = async (app: App) => {
 };
 
 const generateTweet = async (options: GenerateTweetOptions) => {
-  const { allRank, specificRank, mostRecentRank, appName, category } = options;
+  const { allRank, specificRank, mostRecentRank, appName, category, emoji } = options;
   const generateAllTrend = () => {
     if (!mostRecentRank?.allRank) return;
     if (mostRecentRank.allRank === allRank) return `📊 ${allRank} (+0)`;
@@ -111,7 +114,7 @@ const generateTweet = async (options: GenerateTweetOptions) => {
   };
 
   return `
-   👻 ${appName} App Rank
+   ${emoji} ${appName} App Rank
   📅 ${new Date().getDate()} ${new Date().toLocaleString("en-AU", { month: "short" })} 8${new Date().getUTCHours() / 12 >= 1 ? "PM" : "AM"}
     
   🌎 All apps
@@ -165,6 +168,7 @@ const main = async () => {
         mostRecentRank,
         appName: app.name,
         category: app.category,
+        emoji: app.emoji,
       });
       await sendTweet(tweet);
       await db.insert(schema.appTracking).values({
