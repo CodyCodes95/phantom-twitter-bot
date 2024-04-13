@@ -1,4 +1,4 @@
-import { date, integer, pgEnum, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const appTracking = pgTable("appTracking", {
   id: serial("id").primaryKey(),

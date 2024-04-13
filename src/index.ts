@@ -62,7 +62,16 @@ const getAppRankings = async (app: App) => {
   return appRanks;
 };
 
-const generateTweet = async (allRank: number, specificRank: number, mostRecentRank: MostRecentRank) => {
+type GenerateTweetOptions = {
+  allRank: number;
+  specificRank: number;
+  mostRecentRank: MostRecentRank;
+  appName: string;
+  category: string;
+};
+
+const generateTweet = async (options: GenerateTweetOptions) => {
+  const { allRank, specificRank, mostRecentRank, appName, category } = options;
   const generateAllTrend = () => {
     if (!mostRecentRank?.allRank) return;
     if (mostRecentRank.allRank === allRank) return `📊 ${allRank} (+0)`;
@@ -126,8 +135,14 @@ const main = async () => {
   for (const app of appsToTrack) {
     const appRanks = await getAppRankings(app);
     if (!appRanks || !mostRecentRank) return;
-    const tweet = await generateTweet(appRanks.allRank, appRanks.specificRank, mostRecentRank);
-    console.log(tweet);
+    const tweet = await generateTweet({
+      allRank: appRanks.allRank,
+      specificRank: appRanks.specificRank,
+      mostRecentRank,
+      appName: app.name,
+      category: app.category,
+    });
+    if (isNaN(appRanks.allRank)) throw new Error("NaN");
     await sendTweet(tweet);
     await db.insert(schema.appTracking).values({
       app: app.name,
