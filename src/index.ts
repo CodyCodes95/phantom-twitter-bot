@@ -2,7 +2,7 @@ import puppeteer from "puppeteer";
 
 import * as schema from "./db/schema";
 import { TwitterApi } from "twitter-api-v2";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import cron from "node-cron";
 import { db } from "./db/db";
 
@@ -48,11 +48,11 @@ const getAppsToTrack = (yesterdaysDate: string) => {
       url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
       category: "Utilities",
     },
-    // {
-    //   name: "Coinbase Wallet",
-    //   url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
-    //   category: "Finance",
-    // },
+    {
+      name: "Coinbase Wallet",
+      url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
+      category: "Finance",
+    },
   ];
 };
 
@@ -111,7 +111,7 @@ const generateTweet = async (options: GenerateTweetOptions) => {
   };
 
   return `
-  👻 ${appName} App Rank
+   👻 ${appName} App Rank
   📅 ${new Date().getDate()} ${new Date().toLocaleString("en-AU", { month: "short" })} 8${new Date().getUTCHours() / 12 >= 1 ? "PM" : "AM"}
     
   🌎 All apps
@@ -148,15 +148,17 @@ const main = async () => {
     const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
     const appsToTrack = getAppsToTrack(yesterdaysDate);
 
-    const mostRecentRank = await db.query.appTracking.findFirst({
-      orderBy: desc(schema.appTracking.date),
-    });
-
     for (const app of appsToTrack) {
+      const mostRecentRank = await db.query.appTracking.findFirst({
+        orderBy: desc(schema.appTracking.date),
+        where: eq(schema.appTracking.app, app.name),
+      });
+      if (!mostRecentRank) throw new Error("Could not fetch most recent ranking from db");
+
       const appRanks = await scrapeAppRankings(app);
       if (!appRanks) throw new Error("Retrived invalid app rankings");
-      if (!mostRecentRank) throw new Error("Could not fetch most recent ranking from db");
       if (isNaN(appRanks.allRank) || isNaN(appRanks.specificRank)) throw new Error("Retrived invalid app rankings");
+
       const tweet = await generateTweet({
         allRank: appRanks.allRank,
         specificRank: appRanks.specificRank,
@@ -186,4 +188,4 @@ const main = async () => {
 
 cron.schedule("0 8 * * *", main);
 
-// main()
+// main();
