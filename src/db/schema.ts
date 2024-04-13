@@ -8,3 +8,10 @@ export const appTracking = pgTable("appTracking", {
   allRank: integer("allRank"),
   specificRank: integer("specificRank"),
 });
+
+export const logs = pgTable("logs", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { length: 256 }),
+  message: varchar("message", { length: 256 }),
+  createdOn: timestamp("createdOn"),
+});

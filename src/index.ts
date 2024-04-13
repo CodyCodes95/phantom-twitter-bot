@@ -1,10 +1,10 @@
 import puppeteer from "puppeteer";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+
 import * as schema from "./db/schema";
 import { TwitterApi } from "twitter-api-v2";
 import { desc } from "drizzle-orm";
 import cron from "node-cron";
+import { db } from "./db/db";
 
 type App = {
   name: string;
@@ -111,47 +111,69 @@ const sendTweet = async (tweet: string) => {
 };
 
 const main = async () => {
-  const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
-  const appsToTrack = [
-    {
-      name: "Phantom",
-      url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
-      category: "Utilities",
-    },
-    // {
-    //   name: "Coinbase Wallet",
-    //   url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
-    //   category: "Finance",
-    // },
-  ];
+  try {
+    await writeLog({ type: "log", message: "Started" });
+    const yesterdaysDate = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split("T")[0];
+    const appsToTrack = [
+      {
+        name: "Phantom",
+        url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1598432977&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=36&category=0&category=6002&chart_type=free&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
+        category: "Utilities",
+      },
+      // {
+      //   name: "Coinbase Wallet",
+      //   url: `https://app.sensortower.com/category-rankings?os=ios&app_id=1278383455&start_date=${yesterdaysDate}&end_date=${yesterdaysDate}&countries=US&category=6015&category=0&category=36&chart_type=free&chart_type=paid&device=iphone&hourly=false&selected_tab=charts&date=${yesterdaysDate}&summary_chart_type=topfreeapplications`,
+      //   category: "Finance",
+      // },
+    ];
 
-  const sql = neon(process.env.DATABASE_URL!);
-  const db = drizzle(sql, { schema });
-
-  const mostRecentRank = await db.query.appTracking.findFirst({
-    orderBy: desc(schema.appTracking.date),
-  });
-
-  for (const app of appsToTrack) {
-    const appRanks = await getAppRankings(app);
-    if (!appRanks || !mostRecentRank) return;
-    const tweet = await generateTweet({
-      allRank: appRanks.allRank,
-      specificRank: appRanks.specificRank,
-      mostRecentRank,
-      appName: app.name,
-      category: app.category,
+    const mostRecentRank = await db.query.appTracking.findFirst({
+      orderBy: desc(schema.appTracking.date),
     });
-    if (isNaN(appRanks.allRank)) throw new Error("NaN");
-    await sendTweet(tweet);
-    await db.insert(schema.appTracking).values({
-      app: app.name,
-      date: new Date(),
-      category: app.category,
-      allRank: Number(appRanks.allRank),
-      specificRank: Number(appRanks.specificRank),
-    });
+
+    for (const app of appsToTrack) {
+      const appRanks = await getAppRankings(app);
+      if (!appRanks || !mostRecentRank) return;
+      const tweet = await generateTweet({
+        allRank: appRanks.allRank,
+        specificRank: appRanks.specificRank,
+        mostRecentRank,
+        appName: app.name,
+        category: app.category,
+      });
+      if (isNaN(appRanks.allRank)) throw new Error("NaN");
+      await sendTweet(tweet);
+      await db.insert(schema.appTracking).values({
+        app: app.name,
+        date: new Date(),
+        category: app.category,
+        allRank: Number(appRanks.allRank),
+        specificRank: Number(appRanks.specificRank),
+      });
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      await writeLog({
+        type: "error",
+        message: error.message,
+      });
+      console.error(error);
+    }
   }
+};
+
+type WriteLogOptions = {
+  type: string;
+  message: string;
+};
+
+const writeLog = async (options: WriteLogOptions) => {
+  const { type, message } = options;
+  await db.insert(schema.logs).values({
+    type,
+    message,
+    createdOn: new Date(),
+  });
 };
 
 cron.schedule("0 8 * * *", main);
